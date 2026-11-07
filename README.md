@@ -1,6 +1,45 @@
-# FPGA Market Engine
+<div align="center">
 
-A sell order for 30 hits the book at 110. A trade takes 10. The ask stays at 110. The next trade takes the remaining 20, and the ask disappears. This SystemVerilog engine runs that sequence on a **Terasic DE0-Nano**. The SignalTap trace below catches the FPGA writing each change into the book.
+# FPGA MARKET ENGINE
+### From market messages to best bid & offer — in SystemVerilog.
+
+A hardware order-book engine running on the **Terasic DE0-Nano · Cyclone IV E**.  
+Decode a **128-bit message**, update a **16-slot order store**, and publish the **best bid and offer** after a complete book scan.
+
+![SystemVerilog](https://img.shields.io/badge/RTL-SystemVerilog-6366f1?style=for-the-badge)
+![Cyclone IV E](https://img.shields.io/badge/FPGA-Cyclone_IV_E-0ea5e9?style=for-the-badge)
+![50 MHz](https://img.shields.io/badge/Board_clock-50_MHz-14b8a6?style=for-the-badge)
+
+**ADD · CANCEL · TRADE** &nbsp; | &nbsp; **SignalTap hardware capture** &nbsp; | &nbsp; **15 integration checks**
+
+[Hardware evidence](#captured-on-silicon) · [Resource & timing results](#inside-the-fpga) · [Run the tests](#run-the-tests) · [Replay on hardware](#replay-on-hardware)
+
+</div>
+
+---
+
+```text
+  128-bit message       Order-book update          Quote publication
+ ┌────────────────┐    ┌─────────────────────┐    ┌──────────────────┐
+ │ Message parser │───▶│ ADD / CANCEL / TRADE │───▶│ 16-slot BBO scan │
+ └────────────────┘    │ 16-slot order store  │    └────────┬─────────┘
+                       └─────────────────────┘             ▼
+                                                 Best bid + best ask
+                                                 with validity flags
+```
+
+The top-level valid/ready handshake accepts one command at a time. The order manager searches by order ID, applies the update, then shares the store's read port with the BBO scanner. Both quote prices and their valid flags are published together when the scan completes.
+
+| Build footprint | Timing at 50 MHz | Verification |
+|:---|:---|:---|
+| **3,338 / 22,320 LEs (15%)** | **+5.352 ns setup slack** | **Six-message board replay** |
+| **2,668 registers · 19,456 memory bits** | **+0.107 ns hold slack** | **15 integration checks** |
+
+Resource and timing figures are the existing reported results for the **full board demo with SignalTap enabled**, not an isolated engine benchmark. See [the detailed results and timing-corner context below](#inside-the-fpga). The 50 MHz board clock is not a claim of one message per cycle; message throughput and end-to-end latency are not reported here.
+
+## Captured on silicon
+
+A sell order for 30 hits the book at 110. A trade takes 10. The ask stays at 110. The next trade takes the remaining 20, and the ask disappears. The SignalTap trace below captures the FPGA writing each change into the book.
 
 ![Six order-store writes captured on the DE0-Nano](docs/signaltap-order-writes.png)
 
