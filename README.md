@@ -19,13 +19,13 @@ Decode a **128-bit message**, update a **16-slot order store**, and publish the 
 ---
 
 ```text
-  128-bit message       Order-book update          Quote publication
- ┌────────────────┐    ┌─────────────────────┐    ┌──────────────────┐
- │ Message parser │───▶│ ADD / CANCEL / TRADE │───▶│ 16-slot BBO scan │
- └────────────────┘    │ 16-slot order store  │    └────────┬─────────┘
-                       └─────────────────────┘             ▼
-                                                 Best bid + best ask
-                                                 with validity flags
+  128-bit message          Order-book update           Quote publication
+ ┌────────────────┐     ┌─────────────────────┐      ┌──────────────────┐
+ │ Message parser │───▶│ ADD / CANCEL / TRADE│───▶  │ 16-slot BBO scan │
+ └────────────────┘     │ 16-slot order store │      └────────┬─────────┘
+                        └─────────────────────┘               ▼
+                                                    Best bid + best ask
+                                                    with validity flags
 ```
 
 The top-level valid/ready handshake accepts one command at a time. The order manager searches by order ID, applies the update, then shares the store's read port with the BBO scanner. Both quote prices and their valid flags are published together when the scan completes.
