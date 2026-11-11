@@ -13,12 +13,16 @@ module tb_market_top;
     wire best_bid_valid, best_ask_valid;
     integer accepted_count = 0;
     integer completed_count = 0;
+    integer cycles_to_quote;
 
     always @(posedge clk) begin
     if (rst) begin
         accepted_count <= 0;
         completed_count <= 0;
     end else begin
+        if ((in_valid && in_ready) !== (dut.manager.cmd_valid && dut.manager.cmd_ready))
+            $fatal(1, "Input and order manager must accept on the same edge");
+
         if (in_valid && in_ready)
             accepted_count <= accepted_count + 1;
 
@@ -50,9 +54,13 @@ module tb_market_top;
         // The intervening rising edge accepts the message.
         @(negedge clk);
         in_valid = 0;
+        in_data = 'x;
 
-        while (!done)
+        cycles_to_quote = 0;
+        while (!done) begin
             @(negedge clk);
+            cycles_to_quote = cycles_to_quote + 1;
+        end
 
         if (error !== expected_error)
         $fatal(1,
@@ -95,7 +103,7 @@ module tb_market_top;
         // ADD buy order 1: price 100, quantity 50.
         send_message(2'b00, 1, 100, 50, 1);
         check_quote(100, 32'hFFFFFFFF, 1, 0);
-        $display("PASS: first buy");
+        $display("PASS: first buy (%0d cycles from acceptance to quote)", cycles_to_quote);
 
         // ADD a better buy.
         send_message(2'b00, 2, 105, 20, 1);
@@ -125,7 +133,7 @@ module tb_market_top;
         // Remove the final buy.
         send_message(2'b01, 1, 0, 0, 0);
         check_quote(0, 32'hFFFFFFFF, 0, 0);
-        $display("PASS: empty book");
+        $display("PASS: empty book (%0d cycles from acceptance to quote)", cycles_to_quote);
 
         // Fill all 16 slots with buy orders.
         for (int i = 0; i < 16; i++) begin

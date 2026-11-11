@@ -20,7 +20,6 @@ module market_top (
 
 typedef enum logic [2:0]{
     IDLE,
-    DECODE,
     UPDATE,
     SCAN_START,
     SCAN,
@@ -32,7 +31,7 @@ typedef enum logic [2:0]{
     logic [7:0]  symbol_id;
     logic [31:0] order_id, price, quantity;
     logic        side;
-    logic        parsed_valid, parser_ready;
+    logic        parsed_valid;
 
     // Order manager → controller
     logic cmd_ready;
@@ -51,22 +50,21 @@ typedef enum logic [2:0]{
     // Remember the command's error until REPORT
     logic error_q;
 
-    // Defining
-
-    assign in_ready = (state == IDLE && !rst);
+    // The manager captures the input word on the top-level handshake.
+    assign in_ready = (state == IDLE) && cmd_ready;
     assign busy = (state != IDLE);
     assign done = (state == REPORT && !rst);
     assign scan_start = (state == SCAN_START);
     assign scan_enable = (state == SCAN_START || state == SCAN);
 
 
-message_parser parser (
+message_parser #(.REGISTER_OUTPUTS(1'b0)) parser (
     .clk(clk),
     .rst(rst),
 
     .in_data(in_data),
-    .in_valid(in_valid && in_ready),
-    .in_ready(parser_ready),
+    .in_valid(in_valid && (state == IDLE)),
+    .in_ready(),
 
     .msg_type(msg_type),
     .side(side),
@@ -80,7 +78,7 @@ order_manager manager (
     .clk(clk),
     .rst(rst),
 
-    .cmd_valid((state == DECODE) && parsed_valid),
+    .cmd_valid(parsed_valid),
     .cmd_ready(cmd_ready),
     .cmd_type(msg_type),
     .order_id(order_id),
@@ -135,7 +133,7 @@ always_ff @(posedge clk) begin
         best_ask_valid <= 1'b0;
     end else begin
         // Begin a new transaction with no saved error.
-        if (state == IDLE && in_valid && in_ready)
+        if (in_valid && in_ready)
             error_q <= 1'b0;
 
         // Preserve the manager's result until top-level completion.
@@ -160,18 +158,9 @@ always_comb begin
     
 
     IDLE: begin
-        if (in_valid && in_ready) begin
-        next_state = DECODE ;
-        end
-        end
-
-
-    DECODE: begin
-        if (parsed_valid && cmd_ready) begin
+        if (in_valid && in_ready)
             next_state = UPDATE;
-        
-        end
-     end 
+    end
 
 
     UPDATE: begin
