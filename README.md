@@ -32,10 +32,10 @@ The top-level valid/ready handshake accepts one command at a time. The order man
 
 | Build footprint | Timing at 50 MHz | Verification |
 |:---|:---|:---|
-| **3,338 / 22,320 LEs (15%)** | **+5.352 ns setup slack** | **Six-message board replay** |
-| **2,668 registers · 19,456 memory bits** | **+0.107 ns hold slack** | **15 integration checks** |
+| **3,323 / 22,320 LEs (15%)** | **+5.907 ns setup slack** | **Six-message baseline board replay** |
+| **2,651 registers · 19,456 memory bits** | **+0.136 ns hold slack** | **15 integration checks** |
 
-Resource and timing figures are the existing reported results for the **full board demo with SignalTap enabled**, not an isolated engine benchmark. See [the detailed results and timing-corner context below](#inside-the-fpga). The 50 MHz board clock is not a claim of one message per cycle; message throughput and end-to-end latency are not reported here.
+The resource and timing figures cover the **full board demo with SignalTap enabled**. The archived board capture predates the parser optimisation. See [the build comparison below](#inside-the-fpga).
 
 ## Captured on silicon
 
@@ -49,14 +49,16 @@ Read the buses at each rising clock edge where `write_enable` is high. From left
 
 The engine accepts one **128-bit message** on a valid/ready handshake. The order manager searches a **16-slot book** by order ID and applies the update. It then hands the same read port to the best-bid-and-offer scanner, which checks all 16 slots before publishing both prices and their valid flags together. A new command waits until the engine is ready again.
 
-| Hardware result | Measured value |
-|---|---:|
-| Board clock | 50 MHz (20 ns period) |
-| Logic elements | 3,338 / 22,320 (15%) |
-| Dedicated logic registers | 2,668 |
-| Embedded memory | 19,456 / 608,256 bits |
-| Worst reported setup slack on `CLOCK_50` | +5.352 ns |
-| Worst reported hold slack on `CLOCK_50` | +0.107 ns |
+The decoder selects fixed bit ranges combinationally. The order manager latches them on the rising edge where `in_valid && in_ready`. The integration test counts from that edge until `done` rises with the published quote. The first ADD to an empty book took **37 → 36 cycles** in simulation. Cancelling an order in slot 0 took **22 → 21 cycles**. Each saved cycle is 20 ns at the board clock.
+
+| Full board build | [Registered parser](https://github.com/A7ma06/FPGA-market-engine/tree/74900fcd6c8e1348f1166ebcbba1977d9c41bd05) | Combinational parser |
+|---|---:|---:|
+| Board clock | 50 MHz | 50 MHz |
+| Logic elements | 3,338 | 3,323 |
+| Dedicated logic registers | 2,668 | 2,651 |
+| Embedded memory bits | 19,456 | 19,456 |
+| Worst reported setup slack on `CLOCK_50` | +5.352 ns | +5.907 ns |
+| Worst reported hold slack on `CLOCK_50` | +0.107 ns | +0.136 ns |
 
 Figures come from the Quartus Prime Lite 25.1 Fitter and Timing Analyzer summaries for the **full board demo with SignalTap enabled**, targeting the Cyclone IV E EP4CE22F17C6. Setup and hold minima are taken separately across the reported timing corners.
 
